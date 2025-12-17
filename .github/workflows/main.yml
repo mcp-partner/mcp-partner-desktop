@@ -1,49 +1,72 @@
-name: Wails build
+name: Wails Build & Release
 
+# 触发条件：
+# 1. 所有分支的 push（包括普通提交、tag push）
+# 2. Release 发布时（published 类型：正式发布/发布新版本）
 on:
   push:
-    tags:
-      # Match any new tag
-      - '*'
+    branches: ['*']  # 所有分支的 push 都触发
+    tags: ['*']      # 兼容 tag push（和 Release 联动）
+  release:
+    types: [published]  # 仅当 Release 「发布」时触发（草稿发布不触发）
 
 env:
-  # Necessary for most environments as build failure can occur due to OOM issues
   NODE_OPTIONS: "--max-old-space-size=4096"
 
 jobs:
   build:
     strategy:
-      # Failure in one platform build won't impact the others
       fail-fast: false
       matrix:
         build:
-          - name: 'App'
-            platform:  'linux/amd64'
+          - name: 'App-Linux'
+            platform: 'linux/amd64'
             os: 'ubuntu-latest'
-          - name: 'App'
-            platform:  'windows/amd64'
+            asset_name: 'app-linux-amd64'  # 产物命名（便于区分平台）
+          - name: 'App-Windows'
+            platform: 'windows/amd64'
             os: 'windows-latest'
-          - name: 'App'
-            platform:  'darwin/universal'
+            asset_name: 'app-windows-amd64.exe'
+          - name: 'App-macOS'
+            platform: 'darwin/universal'
             os: 'macos-latest'
+            asset_name: 'app-macos-universal'
 
     runs-on: ${{ matrix.build.os }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v2
+      # 1. 检出主项目代码（升级到 v4，指定根目录）
+      - name: Checkout main project
+        uses: actions/checkout@v4
         with:
           submodules: recursive
+          path: .
 
-      - name: Clone mcp-partner
-        run: git clone https://github.com/Ericwyn/mcp-partner.git
+      # 2. 克隆 mcp-partner 到项目根目录
+      - name: Clone mcp-partner repository
+        run: |
+          git clone -b main --depth 1 https://github.com/Ericwyn/mcp-partner.git ./mcp-partner
+          ls -la ./mcp-partner
+        shell: bash
 
-      - name: Build wails
+      # 3. 构建 Wails 应用（所有触发事件都执行）
+      - name: Build Wails application
         uses: dAppServer/wails-build-action@v2.2
         id: build
         with:
           build-name: ${{ matrix.build.name }}
           build-platform: ${{ matrix.build.platform }}
-          package: false
+          package: false  # 若需要打包成安装包，可改为 true
           go-version: '1.22'
-          # 确保构建上下文是项目根目录（包含 mcp-partner）
           working-directory: .
+
+      # 4. 上传产物到 GitHub Release（仅 Release 发布时执行）
+      - name: Upload to Release
+        if: github.event_name == 'release' && github.event.action == 'published'
+        uses: softprops/action-gh-release@v2
+        with:
+          # 指定要上传的产物路径（Wails 构建产物默认在 build/ 目录，需确认路径）
+          files: |
+            ${{ steps.build.outputs.build-output-dir }}/${{ matrix.build.asset_name }}
+          # 关联到当前发布的 Release
+          tag_name: ${{ github.ref_name }}
+          token: ${{ secrets.GITHUB_TOKEN }}
