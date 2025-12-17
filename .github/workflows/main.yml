@@ -1,67 +1,63 @@
 name: CI
 
 on:
-  # 保留官方触发条件：指定分支的push、PR、手动触发
   push:
     branches: [ "main", "v2", "v3", "dev", "*-*" ]
   pull_request:
     branches: [ "main", "v2", "v3", "dev", "*-*" ]
   workflow_dispatch:
-  # 新增：Release正式发布时触发（用于编译+上传产物）
   release:
     types: [published]
 
-# 全局环境变量（解决OOM、统一Wails版本）
 env:
   NODE_OPTIONS: "--max-old-space-size=4096"
-  WAILS_VERSION: "v2.11.0"  # 统一官方指定的Wails版本
+  WAILS_VERSION: "v2.11.0"
 
 jobs:
-  # ===================== Linux 系列 =====================
   ubuntu2404:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
-      # 新增：克隆mcp-partner到项目根目录（官方步骤后、构建前）
       - name: Clone mcp-partner repository
         run: |
           git clone https://github.com/Ericwyn/mcp-partner.git ./mcp-partner
           rm -rf ./mcp-partner/node_modules ./mcp-partner/package-lock.json
-          ls -la ./mcp-partner  # 验证克隆（可选，调试用）
         shell: bash
       - uses: dAppServer/wails-build-action@main
-        id: build-ubuntu2404  # 新增ID，用于后续定位产物
+        id: build-ubuntu2404
         with:
           build-name: wails
           build-platform: linux/amd64
           wails-build-webview2: "embed"
-          package: false # 保持官方配置：不自动上传
-      # 新增：重命名并压缩编译产物（ubuntu2404）
-      - name: Rename and zip build artifact (ubuntu2404)
+          package: false
+      - name: Rename build artifact (ubuntu2404)
         run: |
           SOURCE_FILE="build/bin/wails"
           TARGET_NAME="wails-ubuntu2404-amd64"
-          zip "${TARGET_NAME}.zip" "$SOURCE_FILE"
+          cp "$SOURCE_FILE" "$TARGET_NAME"
         shell: bash
-      # 新增：上传到GitHub Artifacts（保留7天）
       - name: Upload build artifact to Archive (ubuntu2404)
         uses: actions/upload-artifact@v4
         with:
           name: wails-ubuntu2404-amd64
-          path: wails-ubuntu2404-amd64.zip
+          path: wails-ubuntu2404-amd64
           retention-days: 7
-      # 调整：移到最后，上传压缩后的zip产物
+      - name: Compress for Release (ubuntu2404)
+        if: github.event_name == 'release' && github.event.action == 'published'
+        run: |
+          zip "wails-ubuntu2404-amd64.zip" "wails-ubuntu2404-amd64"
+        shell: bash
       - name: Upload to Release (ubuntu2404)
         if: github.event_name == 'release' && github.event.action == 'published'
         uses: softprops/action-gh-release@v2
         with:
-          files: wails-ubuntu2404-amd64.zip  # 改为压缩后的产物
+          files: wails-ubuntu2404-amd64.zip
           tag_name: ${{ github.ref_name }}
           token: ${{ secrets.GITHUB_TOKEN }}
           overwrite: true
-          file_name: wails-ubuntu2404-amd64.zip  # 显式指定文件名
+          file_name: wails-ubuntu2404-amd64.zip
 
   ubuntu2204:
     runs-on: ubuntu-22.04
@@ -69,7 +65,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
-      # 新增：克隆mcp-partner
       - name: Clone mcp-partner repository
         run: |
           git clone https://github.com/Ericwyn/mcp-partner.git ./mcp-partner
@@ -82,174 +77,145 @@ jobs:
           build-platform: linux/amd64
           wails-build-webview2: "embed"
           package: false
-      # 新增：重命名并压缩编译产物（ubuntu2204）
-      - name: Rename and zip build artifact (ubuntu2204)
+      - name: Rename build artifact (ubuntu2204)
         run: |
           SOURCE_FILE="build/bin/wails"
           TARGET_NAME="wails-ubuntu2204-amd64"
-          zip "${TARGET_NAME}.zip" "$SOURCE_FILE"
+          cp "$SOURCE_FILE" "$TARGET_NAME"
         shell: bash
-      # 新增：上传到GitHub Artifacts（保留7天）
       - name: Upload build artifact to Archive (ubuntu2204)
         uses: actions/upload-artifact@v4
         with:
           name: wails-ubuntu2204-amd64
-          path: wails-ubuntu2204-amd64.zip
+          path: wails-ubuntu2204-amd64
           retention-days: 7
-      # 调整：移到最后，上传压缩后的zip产物
+      - name: Compress for Release (ubuntu2204)
+        if: github.event_name == 'release' && github.event.action == 'published'
+        run: |
+          zip "wails-ubuntu2204-amd64.zip" "wails-ubuntu2204-amd64"
+        shell: bash
       - name: Upload to Release (ubuntu2204)
         if: github.event_name == 'release' && github.event.action == 'published'
         uses: softprops/action-gh-release@v2
         with:
-          files: wails-ubuntu2204-amd64.zip  # 改为压缩后的产物
+          files: wails-ubuntu2204-amd64.zip
           tag_name: ${{ github.ref_name }}
           token: ${{ secrets.GITHUB_TOKEN }}
           overwrite: true
           file_name: wails-ubuntu2204-amd64.zip
 
-  # ===================== macOS 系列 =====================
-  macos15arm64:
-    runs-on: macos-15
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-      # 新增：克隆mcp-partner
-      - name: Clone mcp-partner repository
-        run: |
-          git clone https://github.com/Ericwyn/mcp-partner.git ./mcp-partner
-          rm -rf ./mcp-partner/node_modules ./mcp-partner/package-lock.json
-        shell: bash
-      # 修复：强制package: false，关闭自动打包；增加路径调试
-      - uses: dAppServer/wails-build-action@main
-        id: build-macos15arm64
-        with:
-          build-name: wails
-          build-platform: darwin/universal
-          sign: "false"
-          wails-version: ${{ env.WAILS_VERSION }}
-          sign-macos-apple-password: ${{ secrets.APPLE_PASSWORD }}
-          sign-macos-app-id: "Developer ID Application: Lethean LTD (W2DNA5L5DY)"
-          sign-macos-app-cert: ${{ secrets.MAC_DEVELOPER_CERT }}
-          sign-macos-app-cert-password: ${{ secrets.MAC_DEVELOPER_PASS }}
-          sign-macos-installer-id: "Developer ID Installer: Lethean LTD (W2DNA5L5DY)"
-          sign-macos-installer-cert: ${{ secrets.MAC_DEVELOPER_INSTALL_CERT }}
-          sign-macos-installer-cert-password: ${{ secrets.MAC_DEVELOPER_INSTALL_PASS }}
-          package: "false"  # 强制关闭自动打包，避免ditto错误
-      # 新增：调试 - 打印build目录结构，确认文件路径
-      - name: Debug - List build directory
-        run: |
-          ls -la ./build/
-          ls -la ./build/bin/
-          ls -la ./build/bin/mcp-partner.app/Contents/MacOS/
-        shell: bash
-      # 修复：重命名并压缩编译产物（修正路径+兼容macOS app）
-      - name: Rename and zip build artifact (macos15arm64)
-        run: |
-          # 正确指向生成的可执行文件路径
-          SOURCE_EXEC="${{ steps.build-macos15arm64.outputs.build-output-dir }}/mcp-partner.app/Contents/MacOS/wails"
-          TARGET_EXEC="wails-macos15-universal"
-          # 复制可执行文件到根目录
-          cp "$SOURCE_EXEC" "$TARGET_EXEC"
-          # 方案1：仅压缩可执行文件（体积小，推荐）
-          zip "${TARGET_EXEC}.zip" "$TARGET_EXEC"
-          
-          # 【可选】方案2：压缩完整的app包（如需分发完整app，取消注释下面2行）
-          # TARGET_APP="mcp-partner-macos15-universal.app"
-          # ditto -c -k --keepParent ./build/bin/mcp-partner.app "${TARGET_APP}.zip"
-        shell: bash
-      # 上传到GitHub Artifacts
-      - name: Upload build artifact to Archive (macos15arm64)
-        uses: actions/upload-artifact@v4
-        with:
-          name: wails-macos15-universal
-          path: wails-macos15-universal.zip
-          retention-days: 7
-      # 上传到Release（最后执行）
-      - name: Upload to Release (macos15arm64)
-        if: github.event_name == 'release' && github.event.action == 'published'
-        uses: softprops/action-gh-release@v2
-        with:
-          files: wails-macos15-universal.zip
-          tag_name: ${{ github.ref_name }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-          overwrite: true
-          file_name: wails-macos15-universal.zip
+  # macos15arm64:
+  #   runs-on: macos-15
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #       with:
+  #         submodules: recursive
+  #     - name: Clone mcp-partner repository
+  #       run: |
+  #         git clone https://github.com/Ericwyn/mcp-partner.git ./mcp-partner
+  #         rm -rf ./mcp-partner/node_modules ./mcp-partner/package-lock.json
+  #       shell: bash
+  #     - uses: dAppServer/wails-build-action@main
+  #       id: build-macos15arm64
+  #       with:
+  #         build-name: wails
+  #         build-platform: darwin/universal
+  #         sign: "false"
+  #         wails-version: ${{ env.WAILS_VERSION }}
+  #         sign-macos-apple-password: ${{ secrets.APPLE_PASSWORD }}
+  #         sign-macos-app-id: "Developer ID Application: Lethean LTD (W2DNA5L5DY)"
+  #         sign-macos-app-cert: ${{ secrets.MAC_DEVELOPER_CERT }}
+  #         sign-macos-app-cert-password: ${{ secrets.MAC_DEVELOPER_PASS }}
+  #         sign-macos-installer-id: "Developer ID Installer: Lethean LTD (W2DNA5L5DY)"
+  #         sign-macos-installer-cert: ${{ secrets.MAC_DEVELOPER_INSTALL_CERT }}
+  #         sign-macos-installer-cert-password: ${{ secrets.MAC_DEVELOPER_INSTALL_PASS }}
+  #         package: "false"
+  #     - name: Rename build artifact (macos15arm64)
+  #       run: |
+  #         SOURCE_EXEC="${{ steps.build-macos15arm64.outputs.build-output-dir }}/mcp-partner.app/Contents/MacOS/wails"
+  #         TARGET_EXEC="wails-macos15-universal"
+  #         cp "$SOURCE_EXEC" "$TARGET_EXEC"
+  #       shell: bash
+  #     - name: Upload build artifact to Archive (macos15arm64)
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         name: wails-macos15-universal
+  #         path: wails-macos15-universal
+  #         retention-days: 7
+  #     - name: Compress for Release (macos15arm64)
+  #       if: github.event_name == 'release' && github.event.action == 'published'
+  #       run: |
+  #         zip "wails-macos15-universal.zip" "wails-macos15-universal"
+  #       shell: bash
+  #     - name: Upload to Release (macos15arm64)
+  #       if: github.event_name == 'release' && github.event.action == 'published'
+  #       uses: softprops/action-gh-release@v2
+  #       with:
+  #         files: wails-macos15-universal.zip
+  #         tag_name: ${{ github.ref_name }}
+  #         token: ${{ secrets.GITHUB_TOKEN }}
+  #         overwrite: true
+  #         file_name: wails-macos15-universal.zip
 
-  macos14arm64:
-    runs-on: macos-14
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-      # 新增：克隆mcp-partner
-      - name: Clone mcp-partner repository
-        run: |
-          git clone https://github.com/Ericwyn/mcp-partner.git ./mcp-partner
-          rm -rf ./mcp-partner/node_modules ./mcp-partner/package-lock.json
-        shell: bash
-      # 修复：强制package: false，关闭自动打包
-      - uses: dAppServer/wails-build-action@main
-        id: build-macos14arm64
-        with:
-          build-name: wails
-          build-platform: darwin/universal
-          sign: "false"
-          wails-version: ${{ env.WAILS_VERSION }}
-          sign-macos-apple-password: ${{ secrets.APPLE_PASSWORD }}
-          sign-macos-app-id: "Developer ID Application: Lethean LTD (W2DNA5L5DY)"
-          sign-macos-app-cert: ${{ secrets.MAC_DEVELOPER_CERT }}
-          sign-macos-app-cert-password: ${{ secrets.MAC_DEVELOPER_PASS }}
-          sign-macos-installer-id: "Developer ID Installer: Lethean LTD (W2DNA5L5DY)"
-          sign-macos-installer-cert: ${{ secrets.MAC_DEVELOPER_INSTALL_CERT }}
-          sign-macos-installer-cert-password: ${{ secrets.MAC_DEVELOPER_INSTALL_PASS }}
-          package: "false"  # 强制关闭自动打包
-      # 新增：调试 - 打印build目录结构
-      - name: Debug - List build directory
-        run: |
-          ls -la ./build/
-          ls -la ./build/bin/
-          ls -la ./build/bin/mcp-partner.app/Contents/MacOS/
-        shell: bash
-      # 修复：重命名并压缩编译产物
-      - name: Rename and zip build artifact (macos14arm64)
-        run: |
-          SOURCE_EXEC="${{ steps.build-macos14arm64.outputs.build-output-dir }}/mcp-partner.app/Contents/MacOS/wails"
-          TARGET_EXEC="wails-macos14-universal"
-          cp "$SOURCE_EXEC" "$TARGET_EXEC"
-          # 仅压缩可执行文件
-          zip "${TARGET_EXEC}.zip" "$TARGET_EXEC"
-          
-          # 【可选】压缩完整app包（如需分发完整app，取消注释）
-          # TARGET_APP="mcp-partner-macos14-universal.app"
-          # ditto -c -k --keepParent ./build/bin/mcp-partner.app "${TARGET_APP}.zip"
-        shell: bash
-      # 上传到GitHub Artifacts
-      - name: Upload build artifact to Archive (macos14arm64)
-        uses: actions/upload-artifact@v4
-        with:
-          name: wails-macos14-universal
-          path: wails-macos14-universal.zip
-          retention-days: 7
-      # 上传到Release（最后执行）
-      - name: Upload to Release (macos14arm64)
-        if: github.event_name == 'release' && github.event.action == 'published'
-        uses: softprops/action-gh-release@v2
-        with:
-          files: wails-macos14-universal.zip
-          tag_name: ${{ github.ref_name }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-          overwrite: true
-          file_name: wails-macos14-universal.zip
+  # macos14arm64:
+  #   runs-on: macos-14
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #       with:
+  #         submodules: recursive
+  #     - name: Clone mcp-partner repository
+  #       run: |
+  #         git clone https://github.com/Ericwyn/mcp-partner.git ./mcp-partner
+  #         rm -rf ./mcp-partner/node_modules ./mcp-partner/package-lock.json
+  #       shell: bash
+  #     - uses: dAppServer/wails-build-action@main
+  #       id: build-macos14arm64
+  #       with:
+  #         build-name: wails
+  #         build-platform: darwin/universal
+  #         sign: "false"
+  #         wails-version: ${{ env.WAILS_VERSION }}
+  #         sign-macos-apple-password: ${{ secrets.APPLE_PASSWORD }}
+  #         sign-macos-app-id: "Developer ID Application: Lethean LTD (W2DNA5L5DY)"
+  #         sign-macos-app-cert: ${{ secrets.MAC_DEVELOPER_CERT }}
+  #         sign-macos-app-cert-password: ${{ secrets.MAC_DEVELOPER_PASS }}
+  #         sign-macos-installer-id: "Developer ID Installer: Lethean LTD (W2DNA5L5DY)"
+  #         sign-macos-installer-cert: ${{ secrets.MAC_DEVELOPER_INSTALL_CERT }}
+  #         sign-macos-installer-cert-password: ${{ secrets.MAC_DEVELOPER_INSTALL_PASS }}
+  #         package: "false"
+  #     - name: Rename build artifact (macos14arm64)
+  #       run: |
+  #         SOURCE_EXEC="${{ steps.build-macos14arm64.outputs.build-output-dir }}/mcp-partner.app/Contents/MacOS/wails"
+  #         TARGET_EXEC="wails-macos14-universal"
+  #         cp "$SOURCE_EXEC" "$TARGET_EXEC"
+  #       shell: bash
+  #     - name: Upload build artifact to Archive (macos14arm64)
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         name: wails-macos14-universal
+  #         path: wails-macos14-universal
+  #         retention-days: 7
+  #     - name: Compress for Release (macos14arm64)
+  #       if: github.event_name == 'release' && github.event.action == 'published'
+  #       run: |
+  #         zip "wails-macos14-universal.zip" "wails-macos14-universal"
+  #       shell: bash
+  #     - name: Upload to Release (macos14arm64)
+  #       if: github.event_name == 'release' && github.event.action == 'published'
+  #       uses: softprops/action-gh-release@v2
+  #       with:
+  #         files: wails-macos14-universal.zip
+  #         tag_name: ${{ github.ref_name }}
+  #         token: ${{ secrets.GITHUB_TOKEN }}
+  #         overwrite: true
+  #         file_name: wails-macos14-universal.zip
 
-  # ===================== Windows 系列 =====================
   windows2025:
     runs-on: windows-2025
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
-      # 新增：克隆mcp-partner（Windows兼容bash）
       - name: Clone mcp-partner repository
         shell: bash
         run: |
@@ -263,27 +229,28 @@ jobs:
           wails-build-webview2: "embed"
           nsis: 'false'
           package: false
-      # 新增：重命名并压缩编译产物（windows2025）
-      - name: Rename and zip build artifact (windows2025)
+      - name: Rename build artifact (windows2025)
         run: |
           SOURCE_FILE="build/bin/wails.exe"
           TARGET_NAME="wails-windows2025-amd64.exe"
           cp "$SOURCE_FILE" "$TARGET_NAME"
-          pwsh -Command "Compress-Archive -Path '$TARGET_NAME' -DestinationPath '${TARGET_NAME}.zip' -Force"
         shell: bash
-      # 新增：上传到GitHub Artifacts（保留7天）
       - name: Upload build artifact to Archive (windows2025)
         uses: actions/upload-artifact@v4
         with:
           name: wails-windows2025-amd64
-          path: wails-windows2025-amd64.exe.zip
+          path: wails-windows2025-amd64.exe
           retention-days: 7
-      # 调整：移到最后，上传压缩后的zip产物
+      - name: Compress for Release (windows2025)
+        if: github.event_name == 'release' && github.event.action == 'published'
+        run: |
+          pwsh -Command "Compress-Archive -Path 'wails-windows2025-amd64.exe' -DestinationPath 'wails-windows2025-amd64.exe.zip' -Force"
+        shell: bash
       - name: Upload to Release (windows2025)
         if: github.event_name == 'release' && github.event.action == 'published'
         uses: softprops/action-gh-release@v2
         with:
-          files: wails-windows2025-amd64.exe.zip  # 改为压缩后的产物
+          files: wails-windows2025-amd64.exe.zip
           tag_name: ${{ github.ref_name }}
           token: ${{ secrets.GITHUB_TOKEN }}
           overwrite: true
@@ -295,7 +262,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
-      # 新增：克隆mcp-partner
       - name: Clone mcp-partner repository
         shell: bash
         run: |
@@ -309,27 +275,28 @@ jobs:
           wails-build-webview2: "embed"
           nsis: 'false'
           package: false
-      # 新增：重命名并压缩编译产物（windows2022）
-      - name: Rename and zip build artifact (windows2022)
+      - name: Rename build artifact (windows2022)
         run: |
           SOURCE_FILE="build/bin/wails.exe"
           TARGET_NAME="wails-windows2022-amd64.exe"
           cp "$SOURCE_FILE" "$TARGET_NAME"
-          pwsh -Command "Compress-Archive -Path '$TARGET_NAME' -DestinationPath '${TARGET_NAME}.zip' -Force"
         shell: bash
-      # 新增：上传到GitHub Artifacts（保留7天）
       - name: Upload build artifact to Archive (windows2022)
         uses: actions/upload-artifact@v4
         with:
           name: wails-windows2022-amd64
-          path: wails-windows2022-amd64.exe.zip
+          path: wails-windows2022-amd64.exe
           retention-days: 7
-      # 调整：移到最后，上传压缩后的zip产物
+      - name: Compress for Release (windows2022)
+        if: github.event_name == 'release' && github.event.action == 'published'
+        run: |
+          pwsh -Command "Compress-Archive -Path 'wails-windows2022-amd64.exe' -DestinationPath 'wails-windows2022-amd64.exe.zip' -Force"
+        shell: bash
       - name: Upload to Release (windows2022)
         if: github.event_name == 'release' && github.event.action == 'published'
         uses: softprops/action-gh-release@v2
         with:
-          files: wails-windows2022-amd64.exe.zip  # 改为压缩后的产物
+          files: wails-windows2022-amd64.exe.zip
           tag_name: ${{ github.ref_name }}
           token: ${{ secrets.GITHUB_TOKEN }}
           overwrite: true
@@ -341,7 +308,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
-      # 新增：克隆mcp-partner
       - name: Clone mcp-partner repository
         shell: bash
         run: |
@@ -355,27 +321,28 @@ jobs:
           wails-build-webview2: "embed"
           nsis: 'false'
           package: false
-      # 新增：重命名并压缩编译产物（windows2019）
-      - name: Rename and zip build artifact (windows2019)
+      - name: Rename build artifact (windows2019)
         run: |
           SOURCE_FILE="build/bin/wails.exe"
           TARGET_NAME="wails-windows2019-amd64.exe"
           cp "$SOURCE_FILE" "$TARGET_NAME"
-          pwsh -Command "Compress-Archive -Path '$TARGET_NAME' -DestinationPath '${TARGET_NAME}.zip' -Force"
         shell: bash
-      # 新增：上传到GitHub Artifacts（保留7天）
       - name: Upload build artifact to Archive (windows2019)
         uses: actions/upload-artifact@v4
         with:
           name: wails-windows2019-amd64
-          path: wails-windows2019-amd64.exe.zip
+          path: wails-windows2019-amd64.exe
           retention-days: 7
-      # 调整：移到最后，上传压缩后的zip产物
+      - name: Compress for Release (windows2019)
+        if: github.event_name == 'release' && github.event.action == 'published'
+        run: |
+          pwsh -Command "Compress-Archive -Path 'wails-windows2019-amd64.exe' -DestinationPath 'wails-windows2019-amd64.exe.zip' -Force"
+        shell: bash
       - name: Upload to Release (windows2019)
         if: github.event_name == 'release' && github.event.action == 'published'
         uses: softprops/action-gh-release@v2
         with:
-          files: wails-windows2019-amd64.exe.zip  # 改为压缩后的产物
+          files: wails-windows2019-amd64.exe.zip
           tag_name: ${{ github.ref_name }}
           token: ${{ secrets.GITHUB_TOKEN }}
           overwrite: true
@@ -387,7 +354,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
-      # 新增：克隆mcp-partner
       - name: Clone mcp-partner repository
         shell: bash
         run: |
@@ -401,28 +367,28 @@ jobs:
           wails-build-webview2: "embed"
           nsis: "true"
           package: false
-      # 新增：重命名并压缩编译产物（windows-nsis）
-      - name: Rename and zip build artifact (windows-nsis)
+      - name: Rename build artifact (windows-nsis)
         run: |
-          # 找到NSIS生成的安装包（排除原始wails.exe）
           SOURCE_FILE=$(ls ${{ steps.build-windows-nsis.outputs.build-output-dir }}/*.exe | grep -v wails.exe | head -n1)
           TARGET_NAME="wails-windows-installer.exe"
           cp "$SOURCE_FILE" "$TARGET_NAME"
-          pwsh -Command "Compress-Archive -Path '$TARGET_NAME' -DestinationPath '${TARGET_NAME}.zip' -Force"
         shell: bash
-      # 新增：上传到GitHub Artifacts（保留7天）
       - name: Upload build artifact to Archive (windows-nsis)
         uses: actions/upload-artifact@v4
         with:
           name: wails-windows-installer
-          path: wails-windows-installer.exe.zip
+          path: wails-windows-installer.exe
           retention-days: 7
-      # 调整：移到最后，上传压缩后的zip产物（删除了多余的空步骤）
+      - name: Compress for Release (windows-nsis)
+        if: github.event_name == 'release' && github.event.action == 'published'
+        run: |
+          pwsh -Command "Compress-Archive -Path 'wails-windows-installer.exe' -DestinationPath 'wails-windows-installer.exe.zip' -Force"
+        shell: bash
       - name: Upload to Release (windows-nsis)
         if: github.event_name == 'release' && github.event.action == 'published'
         uses: softprops/action-gh-release@v2
         with:
-          files: wails-windows-installer.exe.zip  # 改为压缩后的产物
+          files: wails-windows-installer.exe.zip
           tag_name: ${{ github.ref_name }}
           token: ${{ secrets.GITHUB_TOKEN }}
           overwrite: true
