@@ -38,19 +38,10 @@ jobs:
           build-platform: linux/amd64
           wails-build-webview2: "embed"
           package: false # 保持官方配置：不自动上传
-      # 新增：Release发布时，上传该产物到GitHub Release
-      - name: Upload to Release (ubuntu2404)
-        if: github.event_name == 'release' && github.event.action == 'published'
-        uses: softprops/action-gh-release@v2
-        with:
-          files: ${{ steps.build-ubuntu2404.outputs.build-output-dir }}/wails
-          tag_name: ${{ github.ref_name }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-          overwrite: true
       # 新增：重命名并压缩编译产物（ubuntu2404）
       - name: Rename and zip build artifact (ubuntu2404)
         run: |
-          SOURCE_FILE="${{ steps.build-ubuntu2404.outputs.build-output-dir }}/wails"
+          SOURCE_FILE="build/bin/wails"
           TARGET_NAME="wails-ubuntu2404-amd64"
           zip "${TARGET_NAME}.zip" "$SOURCE_FILE"
         shell: bash
@@ -61,6 +52,16 @@ jobs:
           name: wails-ubuntu2404-amd64
           path: wails-ubuntu2404-amd64.zip
           retention-days: 7
+      # 调整：移到最后，上传压缩后的zip产物
+      - name: Upload to Release (ubuntu2404)
+        if: github.event_name == 'release' && github.event.action == 'published'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: wails-ubuntu2404-amd64.zip  # 改为压缩后的产物
+          tag_name: ${{ github.ref_name }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          overwrite: true
+          file_name: wails-ubuntu2404-amd64.zip  # 显式指定文件名
 
   ubuntu2204:
     runs-on: ubuntu-22.04
@@ -81,19 +82,10 @@ jobs:
           build-platform: linux/amd64
           wails-build-webview2: "embed"
           package: false
-      # 新增：Release上传
-      - name: Upload to Release (ubuntu2204)
-        if: github.event_name == 'release' && github.event.action == 'published'
-        uses: softprops/action-gh-release@v2
-        with:
-          files: ${{ steps.build-ubuntu2204.outputs.build-output-dir }}/wails
-          tag_name: ${{ github.ref_name }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-          overwrite: true
       # 新增：重命名并压缩编译产物（ubuntu2204）
       - name: Rename and zip build artifact (ubuntu2204)
         run: |
-          SOURCE_FILE="${{ steps.build-ubuntu2204.outputs.build-output-dir }}/wails"
+          SOURCE_FILE="build/bin/wails"
           TARGET_NAME="wails-ubuntu2204-amd64"
           zip "${TARGET_NAME}.zip" "$SOURCE_FILE"
         shell: bash
@@ -104,6 +96,16 @@ jobs:
           name: wails-ubuntu2204-amd64
           path: wails-ubuntu2204-amd64.zip
           retention-days: 7
+      # 调整：移到最后，上传压缩后的zip产物
+      - name: Upload to Release (ubuntu2204)
+        if: github.event_name == 'release' && github.event.action == 'published'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: wails-ubuntu2204-amd64.zip  # 改为压缩后的产物
+          tag_name: ${{ github.ref_name }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          overwrite: true
+          file_name: wails-ubuntu2204-amd64.zip
 
   # ===================== macOS 系列 =====================
   macos15arm64:
@@ -133,17 +135,6 @@ jobs:
           sign-macos-installer-cert: ${{ secrets.MAC_DEVELOPER_INSTALL_CERT }}
           sign-macos-installer-cert-password: ${{ secrets.MAC_DEVELOPER_INSTALL_PASS }}
           package: false
-      # 新增：Release上传
-      - name: Upload to Release (macos15arm64)
-        if: github.event_name == 'release' && github.event.action == 'published'
-        uses: softprops/action-gh-release@v2
-        with:
-          # 修正：指向实际生成的可执行文件路径
-          files: ${{ steps.build-macos15arm64.outputs.build-output-dir }}/mcp-partner.app/Contents/MacOS/wails
-          tag_name: ${{ github.ref_name }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-          overwrite: true
-          file_name: wails-macos15-universal
       # 新增：重命名并压缩编译产物（macos15arm64，修正路径）
       - name: Rename and zip build artifact (macos15arm64)
         run: |
@@ -162,6 +153,16 @@ jobs:
           name: wails-macos15-universal
           path: wails-macos15-universal.zip
           retention-days: 7
+      # 调整：移到最后，上传压缩后的zip产物
+      - name: Upload to Release (macos15arm64)
+        if: github.event_name == 'release' && github.event.action == 'published'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: wails-macos15-universal.zip  # 改为压缩后的产物
+          tag_name: ${{ github.ref_name }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          overwrite: true
+          file_name: wails-macos15-universal.zip
 
   macos14arm64:
     runs-on: macos-14
@@ -190,17 +191,6 @@ jobs:
           sign-macos-installer-cert: ${{ secrets.MAC_DEVELOPER_INSTALL_CERT }}
           sign-macos-installer-cert-password: ${{ secrets.MAC_DEVELOPER_INSTALL_PASS }}
           package: false
-      # 新增：Release上传
-      - name: Upload to Release (macos14arm64)
-        if: github.event_name == 'release' && github.event.action == 'published'
-        uses: softprops/action-gh-release@v2
-        with:
-          # 修正：指向实际生成的可执行文件路径
-          files: ${{ steps.build-macos14arm64.outputs.build-output-dir }}/mcp-partner.app/Contents/MacOS/wails
-          tag_name: ${{ github.ref_name }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-          overwrite: true
-          file_name: wails-macos14-universal
       # 新增：重命名并压缩编译产物（macos14arm64，修正路径）
       - name: Rename and zip build artifact (macos14arm64)
         run: |
@@ -219,6 +209,16 @@ jobs:
           name: wails-macos14-universal
           path: wails-macos14-universal.zip
           retention-days: 7
+      # 调整：移到最后，上传压缩后的zip产物
+      - name: Upload to Release (macos14arm64)
+        if: github.event_name == 'release' && github.event.action == 'published'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: wails-macos14-universal.zip  # 改为压缩后的产物
+          tag_name: ${{ github.ref_name }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          overwrite: true
+          file_name: wails-macos14-universal.zip
 
   # ===================== Windows 系列 =====================
   windows2025:
@@ -241,23 +241,13 @@ jobs:
           wails-build-webview2: "embed"
           nsis: 'false'
           package: false
-      # 新增：Release上传
-      - name: Upload to Release (windows2025)
-        if: github.event_name == 'release' && github.event.action == 'published'
-        uses: softprops/action-gh-release@v2
-        with:
-          files: ${{ steps.build-windows2025.outputs.build-output-dir }}/wails.exe
-          tag_name: ${{ github.ref_name }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-          overwrite: true
-          file_name: wails-windows2025.exe
       # 新增：重命名并压缩编译产物（windows2025）
       - name: Rename and zip build artifact (windows2025)
         run: |
-          SOURCE_FILE="${{ steps.build-windows2025.outputs.build-output-dir }}/wails.exe"
+          SOURCE_FILE="build/bin/wails.exe"
           TARGET_NAME="wails-windows2025-amd64.exe"
           cp "$SOURCE_FILE" "$TARGET_NAME"
-          zip "${TARGET_NAME}.zip" "$TARGET_NAME"
+          pwsh -Command "Compress-Archive -Path '$TARGET_NAME' -DestinationPath '${TARGET_NAME}.zip' -Force"
         shell: bash
       # 新增：上传到GitHub Artifacts（保留7天）
       - name: Upload build artifact to Archive (windows2025)
@@ -266,6 +256,16 @@ jobs:
           name: wails-windows2025-amd64
           path: wails-windows2025-amd64.exe.zip
           retention-days: 7
+      # 调整：移到最后，上传压缩后的zip产物
+      - name: Upload to Release (windows2025)
+        if: github.event_name == 'release' && github.event.action == 'published'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: wails-windows2025-amd64.exe.zip  # 改为压缩后的产物
+          tag_name: ${{ github.ref_name }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          overwrite: true
+          file_name: wails-windows2025-amd64.exe.zip
 
   windows2022:
     runs-on: windows-2022
@@ -287,23 +287,13 @@ jobs:
           wails-build-webview2: "embed"
           nsis: 'false'
           package: false
-      # 新增：Release上传
-      - name: Upload to Release (windows2022)
-        if: github.event_name == 'release' && github.event.action == 'published'
-        uses: softprops/action-gh-release@v2
-        with:
-          files: ${{ steps.build-windows2022.outputs.build-output-dir }}/wails.exe
-          tag_name: ${{ github.ref_name }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-          overwrite: true
-          file_name: wails-windows2022.exe
       # 新增：重命名并压缩编译产物（windows2022）
       - name: Rename and zip build artifact (windows2022)
         run: |
-          SOURCE_FILE="${{ steps.build-windows2022.outputs.build-output-dir }}/wails.exe"
+          SOURCE_FILE="build/bin/wails.exe"
           TARGET_NAME="wails-windows2022-amd64.exe"
           cp "$SOURCE_FILE" "$TARGET_NAME"
-          zip "${TARGET_NAME}.zip" "$TARGET_NAME"
+          pwsh -Command "Compress-Archive -Path '$TARGET_NAME' -DestinationPath '${TARGET_NAME}.zip' -Force"
         shell: bash
       # 新增：上传到GitHub Artifacts（保留7天）
       - name: Upload build artifact to Archive (windows2022)
@@ -312,6 +302,16 @@ jobs:
           name: wails-windows2022-amd64
           path: wails-windows2022-amd64.exe.zip
           retention-days: 7
+      # 调整：移到最后，上传压缩后的zip产物
+      - name: Upload to Release (windows2022)
+        if: github.event_name == 'release' && github.event.action == 'published'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: wails-windows2022-amd64.exe.zip  # 改为压缩后的产物
+          tag_name: ${{ github.ref_name }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          overwrite: true
+          file_name: wails-windows2022-amd64.exe.zip
 
   windows2019:
     runs-on: windows-2019
@@ -333,23 +333,13 @@ jobs:
           wails-build-webview2: "embed"
           nsis: 'false'
           package: false
-      # 新增：Release上传
-      - name: Upload to Release (windows2019)
-        if: github.event_name == 'release' && github.event.action == 'published'
-        uses: softprops/action-gh-release@v2
-        with:
-          files: ${{ steps.build-windows2019.outputs.build-output-dir }}/wails.exe
-          tag_name: ${{ github.ref_name }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-          overwrite: true
-          file_name: wails-windows2019.exe
       # 新增：重命名并压缩编译产物（windows2019）
       - name: Rename and zip build artifact (windows2019)
         run: |
-          SOURCE_FILE="${{ steps.build-windows2019.outputs.build-output-dir }}/wails.exe"
+          SOURCE_FILE="build/bin/wails.exe"
           TARGET_NAME="wails-windows2019-amd64.exe"
           cp "$SOURCE_FILE" "$TARGET_NAME"
-          zip "${TARGET_NAME}.zip" "$TARGET_NAME"
+          pwsh -Command "Compress-Archive -Path '$TARGET_NAME' -DestinationPath '${TARGET_NAME}.zip' -Force"
         shell: bash
       # 新增：上传到GitHub Artifacts（保留7天）
       - name: Upload build artifact to Archive (windows2019)
@@ -358,6 +348,16 @@ jobs:
           name: wails-windows2019-amd64
           path: wails-windows2019-amd64.exe.zip
           retention-days: 7
+      # 调整：移到最后，上传压缩后的zip产物
+      - name: Upload to Release (windows2019)
+        if: github.event_name == 'release' && github.event.action == 'published'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: wails-windows2019-amd64.exe.zip  # 改为压缩后的产物
+          tag_name: ${{ github.ref_name }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          overwrite: true
+          file_name: wails-windows2019-amd64.exe.zip
 
   windows-nsis:
     runs-on: windows-2022
@@ -379,17 +379,6 @@ jobs:
           wails-build-webview2: "embed"
           nsis: "true"
           package: false
-      # 新增：Release上传（NSIS安装包）
-      - name: Upload to Release (windows-nsis)
-        if: github.event_name == 'release' && github.event.action == 'published'
-        uses: softprops/action-gh-release@v2
-        with:
-          # NSIS产物默认在build目录下，后缀为.exe安装包
-          files: ${{ steps.build-windows-nsis.outputs.build-output-dir }}/*.exe
-          tag_name: ${{ github.ref_name }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-          overwrite: true
-          file_name: wails-windows-installer.exe
       # 新增：重命名并压缩编译产物（windows-nsis）
       - name: Rename and zip build artifact (windows-nsis)
         run: |
@@ -397,7 +386,7 @@ jobs:
           SOURCE_FILE=$(ls ${{ steps.build-windows-nsis.outputs.build-output-dir }}/*.exe | grep -v wails.exe | head -n1)
           TARGET_NAME="wails-windows-installer.exe"
           cp "$SOURCE_FILE" "$TARGET_NAME"
-          zip "${TARGET_NAME}.zip" "$TARGET_NAME"
+          pwsh -Command "Compress-Archive -Path '$TARGET_NAME' -DestinationPath '${TARGET_NAME}.zip' -Force"
         shell: bash
       # 新增：上传到GitHub Artifacts（保留7天）
       - name: Upload build artifact to Archive (windows-nsis)
@@ -406,3 +395,13 @@ jobs:
           name: wails-windows-installer
           path: wails-windows-installer.exe.zip
           retention-days: 7
+      # 调整：移到最后，上传压缩后的zip产物（删除了多余的空步骤）
+      - name: Upload to Release (windows-nsis)
+        if: github.event_name == 'release' && github.event.action == 'published'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: wails-windows-installer.exe.zip  # 改为压缩后的产物
+          tag_name: ${{ github.ref_name }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          overwrite: true
+          file_name: wails-windows-installer.exe.zip
