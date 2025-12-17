@@ -120,13 +120,14 @@ jobs:
           git clone https://github.com/Ericwyn/mcp-partner.git ./mcp-partner
           rm -rf ./mcp-partner/node_modules ./mcp-partner/package-lock.json
         shell: bash
+      # 修复：强制package: false，关闭自动打包；增加路径调试
       - uses: dAppServer/wails-build-action@main
         id: build-macos15arm64
         with:
           build-name: wails
           build-platform: darwin/universal
           sign: "false"
-          wails-version: ${{ env.WAILS_VERSION }}  # 复用全局变量
+          wails-version: ${{ env.WAILS_VERSION }}
           sign-macos-apple-password: ${{ secrets.APPLE_PASSWORD }}
           sign-macos-app-id: "Developer ID Application: Lethean LTD (W2DNA5L5DY)"
           sign-macos-app-cert: ${{ secrets.MAC_DEVELOPER_CERT }}
@@ -134,31 +135,42 @@ jobs:
           sign-macos-installer-id: "Developer ID Installer: Lethean LTD (W2DNA5L5DY)"
           sign-macos-installer-cert: ${{ secrets.MAC_DEVELOPER_INSTALL_CERT }}
           sign-macos-installer-cert-password: ${{ secrets.MAC_DEVELOPER_INSTALL_PASS }}
-          package: false
-      # 新增：重命名并压缩编译产物（macos15arm64，修正路径）
+          package: "false"  # 强制关闭自动打包，避免ditto错误
+      # 新增：调试 - 打印build目录结构，确认文件路径
+      - name: Debug - List build directory
+        run: |
+          ls -la ./build/
+          ls -la ./build/bin/
+          ls -la ./build/bin/mcp-partner.app/Contents/MacOS/
+        shell: bash
+      # 修复：重命名并压缩编译产物（修正路径+兼容macOS app）
       - name: Rename and zip build artifact (macos15arm64)
         run: |
-          # 修正：指向实际生成的可执行文件（mcp-partner.app 而非 wails.app）
-          SOURCE_FILE="${{ steps.build-macos15arm64.outputs.build-output-dir }}/mcp-partner.app/Contents/MacOS/wails"
-          TARGET_NAME="wails-macos15-universal"
-          # 复制可执行文件到根目录并重命名
-          cp "$SOURCE_FILE" "$TARGET_NAME"
-          # 压缩（macOS 下用 zip 兼容跨平台，避免 ditto 路径问题）
-          zip "${TARGET_NAME}.zip" "$TARGET_NAME"
+          # 正确指向生成的可执行文件路径
+          SOURCE_EXEC="${{ steps.build-macos15arm64.outputs.build-output-dir }}/mcp-partner.app/Contents/MacOS/wails"
+          TARGET_EXEC="wails-macos15-universal"
+          # 复制可执行文件到根目录
+          cp "$SOURCE_EXEC" "$TARGET_EXEC"
+          # 方案1：仅压缩可执行文件（体积小，推荐）
+          zip "${TARGET_EXEC}.zip" "$TARGET_EXEC"
+          
+          # 【可选】方案2：压缩完整的app包（如需分发完整app，取消注释下面2行）
+          # TARGET_APP="mcp-partner-macos15-universal.app"
+          # ditto -c -k --keepParent ./build/bin/mcp-partner.app "${TARGET_APP}.zip"
         shell: bash
-      # 新增：上传到GitHub Artifacts（保留7天）
+      # 上传到GitHub Artifacts
       - name: Upload build artifact to Archive (macos15arm64)
         uses: actions/upload-artifact@v4
         with:
           name: wails-macos15-universal
           path: wails-macos15-universal.zip
           retention-days: 7
-      # 调整：移到最后，上传压缩后的zip产物
+      # 上传到Release（最后执行）
       - name: Upload to Release (macos15arm64)
         if: github.event_name == 'release' && github.event.action == 'published'
         uses: softprops/action-gh-release@v2
         with:
-          files: wails-macos15-universal.zip  # 改为压缩后的产物
+          files: wails-macos15-universal.zip
           tag_name: ${{ github.ref_name }}
           token: ${{ secrets.GITHUB_TOKEN }}
           overwrite: true
@@ -176,6 +188,7 @@ jobs:
           git clone https://github.com/Ericwyn/mcp-partner.git ./mcp-partner
           rm -rf ./mcp-partner/node_modules ./mcp-partner/package-lock.json
         shell: bash
+      # 修复：强制package: false，关闭自动打包
       - uses: dAppServer/wails-build-action@main
         id: build-macos14arm64
         with:
@@ -190,31 +203,40 @@ jobs:
           sign-macos-installer-id: "Developer ID Installer: Lethean LTD (W2DNA5L5DY)"
           sign-macos-installer-cert: ${{ secrets.MAC_DEVELOPER_INSTALL_CERT }}
           sign-macos-installer-cert-password: ${{ secrets.MAC_DEVELOPER_INSTALL_PASS }}
-          package: false
-      # 新增：重命名并压缩编译产物（macos14arm64，修正路径）
+          package: "false"  # 强制关闭自动打包
+      # 新增：调试 - 打印build目录结构
+      - name: Debug - List build directory
+        run: |
+          ls -la ./build/
+          ls -la ./build/bin/
+          ls -la ./build/bin/mcp-partner.app/Contents/MacOS/
+        shell: bash
+      # 修复：重命名并压缩编译产物
       - name: Rename and zip build artifact (macos14arm64)
         run: |
-          # 修正：指向实际生成的可执行文件（mcp-partner.app 而非 wails.app）
-          SOURCE_FILE="${{ steps.build-macos14arm64.outputs.build-output-dir }}/mcp-partner.app/Contents/MacOS/wails"
-          TARGET_NAME="wails-macos14-universal"
-          # 复制可执行文件到根目录并重命名
-          cp "$SOURCE_FILE" "$TARGET_NAME"
-          # 压缩（macOS 下用 zip 兼容跨平台，避免 ditto 路径问题）
-          zip "${TARGET_NAME}.zip" "$TARGET_NAME"
+          SOURCE_EXEC="${{ steps.build-macos14arm64.outputs.build-output-dir }}/mcp-partner.app/Contents/MacOS/wails"
+          TARGET_EXEC="wails-macos14-universal"
+          cp "$SOURCE_EXEC" "$TARGET_EXEC"
+          # 仅压缩可执行文件
+          zip "${TARGET_EXEC}.zip" "$TARGET_EXEC"
+          
+          # 【可选】压缩完整app包（如需分发完整app，取消注释）
+          # TARGET_APP="mcp-partner-macos14-universal.app"
+          # ditto -c -k --keepParent ./build/bin/mcp-partner.app "${TARGET_APP}.zip"
         shell: bash
-      # 新增：上传到GitHub Artifacts（保留7天）
+      # 上传到GitHub Artifacts
       - name: Upload build artifact to Archive (macos14arm64)
         uses: actions/upload-artifact@v4
         with:
           name: wails-macos14-universal
           path: wails-macos14-universal.zip
           retention-days: 7
-      # 调整：移到最后，上传压缩后的zip产物
+      # 上传到Release（最后执行）
       - name: Upload to Release (macos14arm64)
         if: github.event_name == 'release' && github.event.action == 'published'
         uses: softprops/action-gh-release@v2
         with:
-          files: wails-macos14-universal.zip  # 改为压缩后的产物
+          files: wails-macos14-universal.zip
           tag_name: ${{ github.ref_name }}
           token: ${{ secrets.GITHUB_TOKEN }}
           overwrite: true
