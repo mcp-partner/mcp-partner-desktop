@@ -71,7 +71,7 @@ jobs:
             os: macos-latest
             platform: darwin/universal
             nsis: 'false'
-            binary_name: wails
+            binary_name: mcp-partner
             # 最终生成的构件名称，加上 .app 后缀以便系统识别
             artifact_name: mcp-partner-macos-universal.app
 
